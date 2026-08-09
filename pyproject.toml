@@ -1,0 +1,14 @@
+[project]
+name = "hidguard"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "evdev>=1.9.3",
+    "pydantic>=2.13.4",
+    "pytest>=9.1.1",
+    "pyudev>=0.24.4",
+    "ruff>=0.16.2",
+    "ty>=0.0.69",
+]
