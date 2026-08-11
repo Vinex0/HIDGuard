@@ -6,10 +6,14 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "evdev>=1.9.3",
-    "mypy>=2.3.0",
     "pydantic>=2.13.4",
-    "pytest>=9.1.1",
     "pyudev>=0.24.4",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.0",
+    "pytest>=9.1.1",
     "ruff>=0.16.2",
     "ty>=0.0.69",
 ]
@@ -17,3 +21,9 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: requires /dev/uinput access, run explicitly",
+]

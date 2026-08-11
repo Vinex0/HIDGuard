@@ -1,6 +1,7 @@
 from evdev import InputDevice
-from hidguard.models.input_event import InputEvent
 from pydantic import ValidationError
+
+from hidguard.models.input_event import InputEvent
 
 
 def read_evdev_events(device_node, stop_event, session_id):

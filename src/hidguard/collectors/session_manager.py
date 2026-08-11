@@ -12,6 +12,13 @@ class SessionManager:
         self._sessions: dict[str, Session] = {}
 
     def register(self, node: str, session: Session, thread: threading.Thread, stop_event: threading.Event) -> None:
+        """Tracks a session and its reader thread against a device node.
+
+        Any registration already held for the node is retired first: device
+        nodes get reused after a fast unplug/replug, and overwriting outright
+        would strand the old reader with its stop event never set.
+        """
+        self.unregister(node)
         self._sessions[node] = session
         self._readers[node] = (thread, stop_event)
 

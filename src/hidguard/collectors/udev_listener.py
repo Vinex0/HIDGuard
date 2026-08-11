@@ -1,6 +1,7 @@
 import threading
 
 import pyudev
+
 from hidguard.collectors.event_reader import read_evdev_events
 from hidguard.collectors.session_manager import SessionManager
 from hidguard.models.device_model import Device
