@@ -13,7 +13,7 @@ class InputEvent(BaseModel):
     timestamp: float
 
     @classmethod
-    def from_evdev(cls, event, session_id: UUID) -> "InputEvent":
+    def from_evdev(cls, event, session_id: UUID) -> InputEvent:
         return cls(
             session_id=session_id,
             type=event.type,

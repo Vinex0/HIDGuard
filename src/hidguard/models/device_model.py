@@ -11,7 +11,7 @@ class Device(BaseModel):
     interfaces: str | None = None
 
     @classmethod
-    def from_udev(cls, udev_device) -> "Device":
+    def from_udev(cls, udev_device) -> Device:
         vendor_id = udev_device.properties.get("ID_VENDOR_ID")
         model_id = udev_device.properties.get("ID_MODEL_ID")
         vendor_name = udev_device.properties.get("ID_VENDOR")
