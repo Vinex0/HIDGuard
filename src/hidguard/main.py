@@ -17,6 +17,7 @@ from hidguard.models.session import Session
 
 # Track running readers so we can stop them on device removal
 active_readers = {}  # device_node -> (InputDevice, threading.Event)
+active_sessions = {}
 
 def format_udev_info(device):
     lines = [
@@ -59,8 +60,8 @@ def create_device(device):
     except ValidationError as e:
         print(e.errors())
 
-def create_event(event):
-    session = "asodfjlksadjf"
+def create_event(event, session_id):
+    
     event_type = event.type
     code = event.code
     value = event.value
@@ -68,7 +69,7 @@ def create_event(event):
 
     try:
         input_event = InputEvent(
-            session_id=session,
+            session_id=session_id,
             type=event_type,
             code=code,
             value=value,
@@ -96,11 +97,7 @@ def create_session(device):
         print(e.errors())
 
 
-
-
-
-
-def read_evdev_events(device_node, stop_event):
+def read_evdev_events(device_node, stop_event, session_id):
     """Runs in its own thread, printing events until stopped or unplugged."""
     try:
         dev = InputDevice(device_node)
@@ -112,24 +109,15 @@ def read_evdev_events(device_node, stop_event):
 
     try:
         for event in dev.read_loop():
-            print(create_event(event))
+            print(create_event(event, session_id))
             if stop_event.is_set():
                 break
 
-            if event.type == ecodes.EV_KEY:
-                key_event = categorize(event)
-                print(f"[{device_node}] {key_event}")
-            elif event.type == ecodes.EV_REL:
-                print(f"[{device_node}] REL code={event.code} value={event.value}")
-            elif event.type == ecodes.EV_ABS:
-                print(f"[{device_node}] ABS code={event.code} value={event.value}")
-            # EV_SYN events are just sync markers, skip printing them
     except OSError:
         # Device was unplugged mid-read
         pass
     finally:
         dev.close()
-
 
 def handle_add(device):
     node = device.device_node
@@ -144,13 +132,14 @@ def handle_add(device):
     print(device_model)
     session = create_session(device_model)
     print(session)
+    active_sessions[node] = session
     
 
     print("=" * 60)
 
     stop_event = threading.Event()
     thread = threading.Thread(
-        target=read_evdev_events, args=(node, stop_event), daemon=True
+        target=read_evdev_events, args=(node, stop_event, session.id), daemon=True
     )
     active_readers[node] = (thread, stop_event)
     thread.start()
@@ -162,6 +151,12 @@ def handle_remove(device):
         print(f"Device removed: {node}")
         _, stop_event = active_readers.pop(node)
         stop_event.set()
+
+    if node in active_sessions:
+        session = active_sessions.pop(node)
+        session.disconnected_at = time.time()
+        print(f"Session ended: {session.id}, ",
+        f"duration={session.disconnected_at-session.connected_at}")
 
 
 def main():

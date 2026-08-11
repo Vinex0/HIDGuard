@@ -1,4 +1,3 @@
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -7,8 +6,8 @@ from pydantic import BaseModel
 class Session(BaseModel):
     id: UUID
     device_id: str
-    connected_at: datetime
-    disconnected_at: datetime | None = None
+    connected_at: float
+    disconnected_at: float | None = None
     event_count: int = 0
 
     # Interkey delay

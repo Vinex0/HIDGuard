@@ -1,11 +1,11 @@
-from datetime import datetime
+
 
 from pydantic import BaseModel
-
+from uuid import UUID
 
 class InputEvent(BaseModel):
-    session_id: str
+    session_id: UUID
     type: int
     code: int
     value: int
-    timestamp: datetime
+    timestamp: float
