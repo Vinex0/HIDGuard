@@ -1,7 +1,9 @@
-from uuid import UUID
+from __future__ import annotations
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel
 
+import time
 
 class Session(BaseModel):
     id: UUID
@@ -31,3 +33,10 @@ class Session(BaseModel):
     # Kontext
     time_to_first_keystroke_ms: float | None = None
 
+    @classmethod
+    def start(cls, device_id: str) -> "Session":
+        return cls(id=uuid4(), device_id=device_id, connected_at=time.time())
+
+    
+    def end(self) -> None:
+        self.disconnected_at = time.time()

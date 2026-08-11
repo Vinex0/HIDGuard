@@ -8,7 +8,7 @@ import time
 from uuid import uuid4
 
 import pyudev
-from evdev import InputDevice, categorize, ecodes
+from evdev import InputDevice
 from pydantic import ValidationError
 
 from hidguard.models.device_model import Device
@@ -35,66 +35,9 @@ def format_udev_info(device):
 
     return "\n".join(lines)
 
-def create_device(device):
-    vendor_id = device.properties.get("ID_VENDOR_ID")
-    model_id = device.properties.get("ID_MODEL_ID")
-    vendor_name = device.properties.get("ID_VENDOR")
-    model_name = device.properties.get("ID_MODEL")
-    serial = device.properties.get("ID_SERIAL")
-    interfaces = device.properties.get("ID_USB_INTERFACES")
 
-    id_parts = [p for p in (vendor_id, model_id, serial or device.sys_path) if p]
-    device_id = ":".join(id_parts)
 
-    try:
-        pd_device = Device(
-        id= device_id,
-        vendor_id=vendor_id, 
-        model_id=model_id, 
-        vendor_name=vendor_name,
-        model_name=model_name,
-        serial=serial,
-        interfaces=interfaces)
-        return pd_device
 
-    except ValidationError as e:
-        print(e.errors())
-
-def create_event(event, session_id):
-    
-    event_type = event.type
-    code = event.code
-    value = event.value
-    timestamp = event.timestamp()
-
-    try:
-        input_event = InputEvent(
-            session_id=session_id,
-            type=event_type,
-            code=code,
-            value=value,
-            timestamp=timestamp,
-        )
-        return input_event
-
-    except ValidationError as e:
-        print(e.errors())
-
-def create_session(device):
-    id = uuid4()
-    device_id = device.id
-    connected_at = time.time()
-
-    try:
-        session= Session(
-            id=id,
-            device_id=device_id,
-            connected_at=connected_at
-        )
-        return session
-
-    except ValidationError as e:
-        print(e.errors())
 
 
 def read_evdev_events(device_node, stop_event, session_id):
@@ -109,7 +52,7 @@ def read_evdev_events(device_node, stop_event, session_id):
 
     try:
         for event in dev.read_loop():
-            print(create_event(event, session_id))
+            print(InputEvent.from_evdev(event=event, session_id=session_id))
             if stop_event.is_set():
                 break
 
@@ -127,10 +70,10 @@ def handle_add(device):
     print("=" * 60)
     print("New input device connected:")
     print(format_udev_info(device))
-    device_model = create_device(device)
+    device_model = Device.from_udev(device)
     print("\n")
     print(device_model)
-    session = create_session(device_model)
+    session = Session.start(device_model.id)
     print(session)
     active_sessions[node] = session
     
@@ -154,7 +97,7 @@ def handle_remove(device):
 
     if node in active_sessions:
         session = active_sessions.pop(node)
-        session.disconnected_at = time.time()
+        session.end()
         print(f"Session ended: {session.id}, ",
         f"duration={session.disconnected_at-session.connected_at}")
 
