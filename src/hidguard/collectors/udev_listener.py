@@ -32,8 +32,7 @@ def handle_remove(udev_device, session_manager: SessionManager) -> None:
     node = udev_device.device_node
     session = session_manager.unregister(node)
     if session:
-        print(f"Session ended: {session.id}, "
-              f"duration={session.disconnected_at - session.connected_at}")
+        print(f"Session ended: {session.id}")
 
 
 def listen(session_manager: SessionManager) -> None:
