@@ -4,13 +4,16 @@ and prints live events from each device using evdev.
 """
 
 import threading
+import time
+from uuid import uuid4
 
 import pyudev
 from evdev import InputDevice, categorize, ecodes
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
-from hidguard.models.DeviceModel import Device
-from hidguard.models.InputEvent import InputEvent
+from hidguard.models.device_model import Device
+from hidguard.models.input_event import InputEvent
+from hidguard.models.session import Session
 
 # Track running readers so we can stop them on device removal
 active_readers = {}  # device_node -> (InputDevice, threading.Event)
@@ -76,7 +79,26 @@ def create_event(event):
     except ValidationError as e:
         print(e.errors())
 
-    
+def create_session(device):
+    id = uuid4()
+    device_id = device.id
+    connected_at = time.time()
+
+    try:
+        session= Session(
+            id=id,
+            device_id=device_id,
+            connected_at=connected_at
+        )
+        return session
+
+    except ValidationError as e:
+        print(e.errors())
+
+
+
+
+
 
 def read_evdev_events(device_node, stop_event):
     """Runs in its own thread, printing events until stopped or unplugged."""
@@ -117,7 +139,13 @@ def handle_add(device):
     print("=" * 60)
     print("New input device connected:")
     print(format_udev_info(device))
-    print(create_device(device))
+    device_model = create_device(device)
+    print("\n")
+    print(device_model)
+    session = create_session(device_model)
+    print(session)
+    
+
     print("=" * 60)
 
     stop_event = threading.Event()

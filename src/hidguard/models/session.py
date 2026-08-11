@@ -1,8 +1,11 @@
 from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel
 
+
 class Session(BaseModel):
-    id: str
+    id: UUID
     device_id: str
     connected_at: datetime
     disconnected_at: datetime | None = None
