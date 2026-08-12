@@ -9,14 +9,14 @@ CREATE TABLE IF NOT EXISTS devices (
     interfaces TEXT
 );
 
-CREATE TABLE IF NOT EXISTS sessionns (
+CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     device_id TEXT NOT NULL,
     connected_at REAL NOT NULL,
     disconnected_at REAL,
     event_count INTEGER NOT NULL DEFAULT 0,
     avg_interkey_delay_ms REAL,
-    std_interkey_delay_ms: REAL,
+    std_interkey_delay_ms REAL,
     min_interkey_delay_ms REAL,
     max_interkey_delay_ms REAL,
     median_interkey_delay_ms REAL,

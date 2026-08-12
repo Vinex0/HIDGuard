@@ -32,7 +32,7 @@ def stub_reader(monkeypatch):
     calls = []
     started = threading.Event()
 
-    def fake_read(device_node, stop_event, session_id):
+    def fake_read(device_node, stop_event, session_id, repo):
         calls.append((device_node, stop_event, session_id))
         started.set()
 
@@ -40,7 +40,7 @@ def stub_reader(monkeypatch):
     return calls, started
 
 
-def test_handle_add_registers_session_and_starts_reader(stub_reader):
+def test_handle_add_registers_session_and_starts_reader(stub_reader, repo):
     """An 'add' for an event node opens a session and hands it to a reader.
 
     The session id the reader receives must be the one registered for that
@@ -50,7 +50,7 @@ def test_handle_add_registers_session_and_starts_reader(stub_reader):
     manager = SessionManager()
     udev_device = FakeUdevDevice("/dev/input/event5", {"ID_VENDOR_ID": "046d"})
 
-    udev_listener.handle_add(udev_device, manager)
+    udev_listener.handle_add(udev_device, manager, repo)
 
     assert started.wait(timeout=2), "reader thread did not run"
     node, _stop_event, session_id = calls[0]
@@ -63,7 +63,7 @@ def test_handle_add_registers_session_and_starts_reader(stub_reader):
     [None, "/dev/input/js0"],
     ids=["no-node", "joystick-node"],
 )
-def test_handle_add_ignores_non_event_nodes(stub_reader, node):
+def test_handle_add_ignores_non_event_nodes(stub_reader, repo, node):
     """Devices without an event node are skipped entirely.
 
     udev announces several nodes per physical device (js0 for joysticks, and
@@ -73,14 +73,14 @@ def test_handle_add_ignores_non_event_nodes(stub_reader, node):
     calls, started = stub_reader
     manager = SessionManager()
 
-    udev_listener.handle_add(FakeUdevDevice(node), manager)
+    udev_listener.handle_add(FakeUdevDevice(node), manager, repo)
 
     assert calls == []
     assert not started.is_set()
     assert manager.session_id_for(node) is None
 
 
-def test_handle_remove_untracked_node_is_silent(capsys):
+def test_handle_remove_untracked_node_is_silent(capsys, repo):
     """A 'remove' for a node we never registered reports nothing.
 
     handle_add filters most nodes out, so udev delivers removes for devices
@@ -88,6 +88,6 @@ def test_handle_remove_untracked_node_is_silent(capsys):
     """
     manager = SessionManager()
 
-    udev_listener.handle_remove(FakeUdevDevice("/dev/input/js0"), manager)
+    udev_listener.handle_remove(FakeUdevDevice("/dev/input/js0"), manager, repo)
 
     assert "Session ended" not in capsys.readouterr().out

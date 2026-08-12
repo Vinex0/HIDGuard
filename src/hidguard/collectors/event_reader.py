@@ -2,9 +2,10 @@ from evdev import InputDevice
 from pydantic import ValidationError
 
 from hidguard.models.input_event import InputEvent
+from hidguard.storage.sqlite_repo import SqliteRepo
 
 
-def read_evdev_events(device_node, stop_event, session_id):
+def read_evdev_events(device_node, stop_event, session_id, repo: SqliteRepo):
     """Runs in its own thread, printing events until stopped or unplugged."""
     try:
         dev = InputDevice(device_node)
@@ -20,7 +21,7 @@ def read_evdev_events(device_node, stop_event, session_id):
                 break
             try:
                 input_event = InputEvent.from_evdev(event=event, session_id=session_id)
-                print(input_event)
+                repo.save_event(input_event)
             except ValidationError as e:
                 print(f"[{device_node}] Invalid event: {e.errors()}")
 

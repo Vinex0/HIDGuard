@@ -7,10 +7,11 @@ from evdev import ecodes as e
 
 from hidguard.collectors.session_manager import SessionManager
 from hidguard.collectors.udev_listener import listen
+from hidguard.storage.sqlite_repo import SqliteRepo
 
 
 @pytest.mark.integration
-def test_virtual_keyboard_triggers_add_and_remove(capsys):
+def test_virtual_keyboard_triggers_add_and_remove(capsys, tmp_path):
     """End-to-end check of the udev -> session -> event-reader pipeline.
 
     Creates a real virtual keyboard via /dev/uinput and asserts the listener
@@ -28,9 +29,10 @@ def test_virtual_keyboard_triggers_add_and_remove(capsys):
     events, so this can flake on a loaded machine.
     """
     session_manager = SessionManager()
+    repo = SqliteRepo(tmp_path / "hidguard.db")
 
     listener_thread = threading.Thread(
-        target=listen, args=(session_manager,), daemon=True
+        target=listen, args=(session_manager, repo), daemon=True
     )
     listener_thread.start()
     time.sleep(0.5)  # give the udev monitor time to start polling

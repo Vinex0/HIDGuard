@@ -10,7 +10,7 @@ from hidguard.collectors.event_reader import read_evdev_events
 from hidguard.models.session import Session
 
 
-def test_read_evdev_events_reports_unopenable_device_and_returns(capsys):
+def test_read_evdev_events_reports_unopenable_device_and_returns(capsys, repo):
     """A device that cannot be opened is logged and skipped, not raised.
 
     This is the normal outcome for anyone not in the 'input' group, and for
@@ -20,7 +20,9 @@ def test_read_evdev_events_reports_unopenable_device_and_returns(capsys):
     """
     session = Session.start(device_id="dev-1")
 
-    read_evdev_events("/dev/input/event-does-not-exist", threading.Event(), session.id)
+    read_evdev_events(
+        "/dev/input/event-does-not-exist", threading.Event(), session.id, repo
+    )
 
     output = capsys.readouterr().out
     assert "Could not open" in output

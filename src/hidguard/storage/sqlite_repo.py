@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 from hidguard.models.device_model import Device
+from hidguard.models.input_event import InputEvent
 from hidguard.models.session import Session
 from hidguard.storage.schema import SCHEMA
 
@@ -62,3 +63,19 @@ class SqliteRepo:
             data,
         )
         self._conn.commit()
+
+    
+    def save_event(self, event: InputEvent) -> None:
+        data = event.model_dump()
+        data["session_id"] = str(data["session_id"])
+        self._conn.execute(
+            """
+            INSERT INTO input_events (session_id, type, code, value, timestamp)
+            VALUES (:session_id, :type, :code, :value, :timestamp)
+            """,
+            data,
+        )
+        self._conn.commit()
+
+    def close(self) -> None:
+        self._conn.close()
