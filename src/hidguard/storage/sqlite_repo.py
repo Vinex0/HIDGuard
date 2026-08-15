@@ -1,15 +1,14 @@
-from hidguard.models.detection import Detection
+import json
 import sqlite3
+import threading
 from pathlib import Path
 
+from hidguard.models.detection import Detection
 from hidguard.models.device_model import Device
 from hidguard.models.input_event import InputEvent
 from hidguard.models.session import Session
-from hidguard.models.detection import Detection
 from hidguard.storage.schema import SCHEMA
 
-import threading
-import json
 
 class SqliteRepo:
     def __init__(self, db_path: str | Path):

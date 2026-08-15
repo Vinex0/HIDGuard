@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+
 class Detection(BaseModel):
     session_id: UUID
     score: int
