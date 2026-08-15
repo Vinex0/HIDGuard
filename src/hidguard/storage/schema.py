@@ -47,6 +47,6 @@ CREATE TABLE IF NOT EXISTS detections (
     verdict TEXT NOT NULL,
     reasons TEXT NOT NULL,
     evaluated_at REAL NOT NULL,
-    FOREIGN KEY (session_id) REFERENCS sessions(id)
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
 """

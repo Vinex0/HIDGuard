@@ -99,8 +99,8 @@ class SqliteRepo:
                 ON CONFLICT (session_id) DO UPDATE SET
                 score = excluded.score,
                 verdict = excluded.verdict,
-                reasons = excludded.reasons,
-                evauluated_at = excluded.evaluated_at,
+                reasons = excluded.reasons,
+                evaluated_at = excluded.evaluated_at
                 """,
                 data
             )
@@ -117,7 +117,7 @@ class SqliteRepo:
         query = "SELECT * FROM sessions ORDER BY connected_at DESC"
         params = tuple()
         if limit is not None:
-            query += "LIMIT ?"
+            query += " LIMIT ?"
             params = (limit,)
         rows = self._conn.execute(query, params).fetchall()
         return [Session(**dict(row)) for row in rows]
@@ -138,10 +138,10 @@ class SqliteRepo:
         row = self._conn.execute(
             """
             SELECT * FROM devices
-            WHERE device_id = ?
+            WHERE id = ?
             """,
-            str(device_id)
-        ).fetchall()
+            (str(device_id),)
+        ).fetchone()
         return Device(**dict(row)) if row else None
 
     def list_devices(self) -> list[Device]:
@@ -153,7 +153,7 @@ class SqliteRepo:
             """
             SELECT * FROM detections WHERE session_id = ?
             """,
-            str(session_id)
+            (str(session_id),)
         ).fetchone()
         if row is None:
             return None
@@ -164,7 +164,7 @@ class SqliteRepo:
     def list_detections(self) -> list[Detection]:
         rows = self._conn.execute(
             """
-            SELECT * FROM detection ORDER BY evaluated_at DESC
+            SELECT * FROM detections ORDER BY evaluated_at DESC
             """
         ).fetchall()
         results = []
