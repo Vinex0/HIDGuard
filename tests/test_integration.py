@@ -1,6 +1,7 @@
 import threading
 import time
 
+import pyudev
 import pytest
 from evdev import UInput
 from evdev import ecodes as e
@@ -8,6 +9,21 @@ from evdev import ecodes as e
 from hidguard.collectors.session_manager import SessionManager
 from hidguard.collectors.udev_listener import listen
 from hidguard.storage.sqlite_repo import SqliteRepo
+
+
+def _find_real_keyboard_node() -> str:
+    """Locates a device node udev already tags ID_INPUT_KEYBOARD=1.
+
+    Declaring key codes by hand doesn't reliably reproduce that tag: udev's
+    classifier also weighs EV_MSC/EV_REP support, which evdev.UInput doesn't
+    enable unless the source capabilities ask for it. Cloning a real
+    keyboard's capabilities sidesteps needing to reverse-engineer that.
+    """
+    context = pyudev.Context()
+    for device in context.list_devices(subsystem="input", ID_INPUT_KEYBOARD="1"):
+        if device.device_node:
+            return device.device_node
+    raise RuntimeError("No ID_INPUT_KEYBOARD=1 device found to clone capabilities from")
 
 
 @pytest.mark.integration
@@ -20,8 +36,10 @@ def test_virtual_keyboard_triggers_add_and_remove(capsys, tmp_path):
     exit fires 'remove', which ends that session. Unlike the other tests this
     exercises the actual pyudev monitor and evdev reader rather than fakes.
 
-    Requires write access to /dev/uinput. Deselected by default (see addopts in
-    pyproject.toml); run explicitly as root:
+    Requires write access to /dev/uinput and a real keyboard already attached
+    (its capabilities are cloned so udev classifies the virtual device the
+    same way). Deselected by default (see addopts in pyproject.toml); run
+    explicitly as root:
 
         sudo .venv/bin/python -m pytest -m integration
 
@@ -37,8 +55,8 @@ def test_virtual_keyboard_triggers_add_and_remove(capsys, tmp_path):
     listener_thread.start()
     time.sleep(0.5)  # give the udev monitor time to start polling
 
-    capabilities = {e.EV_KEY: [e.KEY_A, e.KEY_ENTER]}
-    with UInput(capabilities, name="hidguard-test-keyboard") as virtual_kb:
+    real_keyboard_node = _find_real_keyboard_node()
+    with UInput.from_device(real_keyboard_node, name="hidguard-test-keyboard") as virtual_kb:
         time.sleep(1)  # give udev time to register the new device
 
         # simulate typing 'a' then Enter
