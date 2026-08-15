@@ -78,6 +78,34 @@ def test_unregister_unknown_node_returns_none():
     assert result is None
 
 
+def test_unregister_all_stops_every_thread_and_ends_every_session():
+    """Shutdown drains the whole registry at once, not node by node.
+
+    Every reader thread must be told to stop and every open session must get
+    a disconnected_at, so nothing is left dangling when the process exits.
+    """
+    manager = SessionManager()
+    sessions = {}
+    stop_events = {}
+    for i, node in enumerate(["/dev/input/event5", "/dev/input/event6"]):
+        session = Session.start(device_id=f"dev-{i}")
+        stop_event = threading.Event()
+        manager.register(node, session, threading.Thread(target=lambda: None), stop_event)
+        sessions[node] = session
+        stop_events[node] = stop_event
+
+    ended = manager.unregister_all()
+
+    assert {s.id for s in ended} == {s.id for s in sessions.values()}
+    assert all(stop_event.is_set() for stop_event in stop_events.values())
+    assert all(session.disconnected_at is not None for session in ended)
+    assert manager.active_sessions() == []
+
+
+def test_unregister_all_on_empty_manager_returns_empty_list():
+    assert SessionManager().unregister_all() == []
+
+
 def test_session_id_for_known_node():
     """A registered node maps back to its session id.
 

@@ -8,7 +8,14 @@ def main():
     session_manager = SessionManager()
     db_path = get_db_path()
     repo = SqliteRepo(db_path)
-    listen(session_manager, repo)
+
+    try:
+        listen(session_manager, repo)
+    except KeyboardInterrupt:
+        print("\nStopped listening.")
+        for session in session_manager.unregister_all():
+            repo.save_session(session)
+        repo.close()
 
 
 if __name__ == '__main__':

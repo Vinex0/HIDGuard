@@ -46,4 +46,17 @@ class SessionManager:
 
     def active_sessions(self) -> list[Session]:
         with self._lock:
-            return list(self._sessions.values()) 
+            return list(self._sessions.values())
+
+    def unregister_all(self) -> list[Session]:
+        """Stops every tracked reader thread and ends every open session.
+
+        Used at shutdown, where every node needs draining at once rather than
+        one at a time by the udev 'remove' path.
+        """
+        with self._lock:
+            return [
+                session
+                for node in list(self._sessions)
+                if (session := self._unregister_locked(node)) is not None
+            ]

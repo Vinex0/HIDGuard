@@ -48,7 +48,9 @@ def test_handle_add_registers_session_and_starts_reader(stub_reader, repo):
     """
     calls, started = stub_reader
     manager = SessionManager()
-    udev_device = FakeUdevDevice("/dev/input/event5", {"ID_VENDOR_ID": "046d"})
+    udev_device = FakeUdevDevice(
+        "/dev/input/event5", {"ID_VENDOR_ID": "046d", "ID_INPUT_KEYBOARD": "1"}
+    )
 
     udev_listener.handle_add(udev_device, manager, repo)
 
@@ -78,6 +80,24 @@ def test_handle_add_ignores_non_event_nodes(stub_reader, repo, node):
     assert calls == []
     assert not started.is_set()
     assert manager.session_id_for(node) is None
+
+
+def test_handle_add_ignores_non_keyboard_devices(stub_reader, repo):
+    """Mice, touchpads, and a keyboard's own non-keyboard event nodes are skipped.
+
+    A single physical keyboard announces several /dev/input/eventN nodes, only
+    one of which is tagged ID_INPUT_KEYBOARD; without this filter every one of
+    them (plus every mouse) opens its own empty session.
+    """
+    calls, started = stub_reader
+    manager = SessionManager()
+    udev_device = FakeUdevDevice("/dev/input/event6", {"ID_INPUT_MOUSE": "1"})
+
+    udev_listener.handle_add(udev_device, manager, repo)
+
+    assert calls == []
+    assert not started.is_set()
+    assert manager.session_id_for("/dev/input/event6") is None
 
 
 def test_handle_remove_untracked_node_is_silent(capsys, repo):

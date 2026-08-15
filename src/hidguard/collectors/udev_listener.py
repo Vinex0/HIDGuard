@@ -14,6 +14,9 @@ def handle_add(udev_device, session_manager: SessionManager, repo: SqliteRepo) -
     if not node or 'event' not in node:
         return  # skip non-event nodes (e.g. js0 joystick nodes, etc.)
 
+    if udev_device.properties.get('ID_INPUT_KEYBOARD') != '1':
+        return  # skip mice, touchpads, and the non-keyboard event nodes a keyboard also exposes
+
     device = Device.from_udev(udev_device)
     repo.save_device(device)
 
@@ -48,11 +51,8 @@ def listen(session_manager: SessionManager, repo: SqliteRepo) -> None:
 
     print("Listening for input device connections... (Ctrl+C to stop)\n")
 
-    try:
-        for udev_device in iter(monitor.poll, None):
-            if udev_device.action == 'add':
-                handle_add(udev_device, session_manager, repo)
-            elif udev_device.action == 'remove':
-                handle_remove(udev_device, session_manager, repo)
-    except KeyboardInterrupt:
-        print("\nStopped listening.")
+    for udev_device in iter(monitor.poll, None):
+        if udev_device.action == 'add':
+            handle_add(udev_device, session_manager, repo)
+        elif udev_device.action == 'remove':
+            handle_remove(udev_device, session_manager, repo)
