@@ -38,4 +38,15 @@ CREATE TABLE IF NOT EXISTS input_events (
     timestamp REAL NOT NULL,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_input_events_session ON input_events(session_id, id);
+
+CREATE TABLE IF NOT EXISTS detections (
+    session_id TEXT PRIMARY KEY,
+    score INTEGER NOT NULL,
+    verdict TEXT NOT NULL,
+    reasons TEXT NOT NULL,
+    evaluated_at REAL NOT NULL,
+    FOREIGN KEY (session_id) REFERENCS sessions(id)
+);
 """
