@@ -115,7 +115,7 @@ class SqliteRepo:
 
     def list_session(self, limit: int | None = None) -> list[Session]:
         query = "SELECT * FROM sessions ORDER BY connected_at DESC"
-        params = tuple()
+        params: tuple[int, ...] = ()
         if limit is not None:
             query += " LIMIT ?"
             params = (limit,)

@@ -4,7 +4,7 @@ import pyudev
 
 from hidguard.collectors.event_reader import read_evdev_events
 from hidguard.collectors.session_manager import SessionManager
-from hidguard.features.features import Features
+from hidguard.features import keystroke
 from hidguard.models.device_model import Device
 from hidguard.models.session import Session
 from hidguard.storage.sqlite_repo import SqliteRepo
@@ -37,15 +37,15 @@ def handle_add(udev_device, session_manager: SessionManager, repo: SqliteRepo) -
     thread.start()
 
 
-def handle_remove(udev_device, session_manager: SessionManager, repo: SqliteRepo, features: Features) -> None:
+def handle_remove(udev_device, session_manager: SessionManager, repo: SqliteRepo) -> None:
     node = udev_device.device_node
     session = session_manager.unregister(node)
     if session:
-        repo.save_session(features.update_session(session=session))
+        repo.save_session(keystroke.update_session(repo, session))
         print(f"Session ended: {session.id}")
 
 
-def listen(session_manager: SessionManager, repo: SqliteRepo, features: Features) -> None:
+def listen(session_manager: SessionManager, repo: SqliteRepo) -> None:
     context = pyudev.Context()
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by(subsystem='input')
@@ -56,4 +56,4 @@ def listen(session_manager: SessionManager, repo: SqliteRepo, features: Features
         if udev_device.action == 'add':
             handle_add(udev_device, session_manager, repo)
         elif udev_device.action == 'remove':
-            handle_remove(udev_device, session_manager, repo, features)
+            handle_remove(udev_device, session_manager, repo)

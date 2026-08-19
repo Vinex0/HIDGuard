@@ -102,7 +102,7 @@ def test_handle_add_ignores_non_keyboard_devices(stub_reader, repo):
     assert manager.session_id_for("/dev/input/event6") is None
 
 
-def test_handle_remove_untracked_node_is_silent(capsys, repo, features):
+def test_handle_remove_untracked_node_is_silent(capsys, repo):
     """A 'remove' for a node we never registered reports nothing.
 
     handle_add filters most nodes out, so udev delivers removes for devices
@@ -110,11 +110,12 @@ def test_handle_remove_untracked_node_is_silent(capsys, repo, features):
     """
     manager = SessionManager()
 
-    udev_listener.handle_remove(FakeUdevDevice("/dev/input/js0"), manager, repo, features)
+    udev_listener.handle_remove(FakeUdevDevice("/dev/input/js0"), manager, repo)
 
     assert "Session ended" not in capsys.readouterr().out
 
-def test_handle_remove_persists_features(stub_reader, repo, features):
+
+def test_handle_remove_persists_features(stub_reader, repo):
     """Ending a session writes the extracted features back to its row.
 
     The reader stores events as they arrive but never touches the session row,
@@ -126,27 +127,32 @@ def test_handle_remove_persists_features(stub_reader, repo, features):
         FakeUdevDevice("/dev/input/event5", {"ID_INPUT_KEYBOARD": "1"}), manager, repo
     )
     session_id = manager.session_id_for("/dev/input/event5")
+    assert session_id is not None, "handle_add did not register a session"
     connected_at = repo.get_session(session_id).connected_at
 
-    # four key-downs, 100ms apart: enough delays for the interkey stats to apply
+    # four key-downs 100ms apart, each held 40ms: spaced far enough apart to
+    # give the interkey stats something to work with and to stay out of a burst
     for offset, code in enumerate((KEY_A, KEY_B, KEY_C, KEY_BACKSPACE)):
-        for value in (1, 0):  # press then release
+        pressed_at = connected_at + 0.5 + offset * 0.1
+        for value, timestamp in ((1, pressed_at), (0, pressed_at + 0.04)):
             repo.save_event(
                 InputEvent(
                     session_id=session_id,
                     type=EV_KEY,
                     code=code,
                     value=value,
-                    timestamp=connected_at + 0.5 + offset * 0.1,
+                    timestamp=timestamp,
                 )
             )
 
-    udev_listener.handle_remove(
-        FakeUdevDevice("/dev/input/event5"), manager, repo, features
-    )
+    udev_listener.handle_remove(FakeUdevDevice("/dev/input/event5"), manager, repo)
 
     stored = repo.get_session(session_id)
     assert stored.event_count == 8
     assert stored.backspace_count == 1
     assert stored.avg_interkey_delay_ms == pytest.approx(100, abs=1)
     assert stored.time_to_first_keystroke_ms == pytest.approx(500, abs=1)
+    assert stored.avg_dwell_time_ms == pytest.approx(40, abs=1)
+    assert stored.std_dwell_time_ms == pytest.approx(0, abs=1)
+    assert stored.max_keys_per_second == 4  # all four presses fall in one second
+    assert stored.longest_burst_length == 1  # 100ms gaps are too slow to chain

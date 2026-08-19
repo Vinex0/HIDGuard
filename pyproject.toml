@@ -23,6 +23,12 @@ dev = [
 requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"
 
+[tool.mypy]
+# pyudev ships no py.typed marker, so its imports are untyped by necessity.
+[[tool.mypy.overrides]]
+module = ["pyudev.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 addopts = "-m 'not integration'"
 markers = [

@@ -124,4 +124,4 @@ def test_input_event_from_evdev_invalid_raises():
     event = FakeEvdevEvent(type_="not-an-int", code=30, value=1)
 
     with pytest.raises(ValidationError):
-        InputEvent.from_evdev(event, "not-a-uuid")
+        InputEvent.from_evdev(event, "not-a-uuid")  # ty: ignore[invalid-argument-type]
