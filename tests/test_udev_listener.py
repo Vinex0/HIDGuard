@@ -8,9 +8,11 @@ test_integration.py covers the same code through a real /dev/uinput device.
 import threading
 
 import pytest
+from evdev.ecodes import EV_KEY, KEY_A, KEY_B, KEY_BACKSPACE, KEY_C
 
 from hidguard.collectors import udev_listener
 from hidguard.collectors.session_manager import SessionManager
+from hidguard.models.input_event import InputEvent
 
 
 class FakeUdevDevice:
@@ -100,7 +102,7 @@ def test_handle_add_ignores_non_keyboard_devices(stub_reader, repo):
     assert manager.session_id_for("/dev/input/event6") is None
 
 
-def test_handle_remove_untracked_node_is_silent(capsys, repo):
+def test_handle_remove_untracked_node_is_silent(capsys, repo, features):
     """A 'remove' for a node we never registered reports nothing.
 
     handle_add filters most nodes out, so udev delivers removes for devices
@@ -108,6 +110,43 @@ def test_handle_remove_untracked_node_is_silent(capsys, repo):
     """
     manager = SessionManager()
 
-    udev_listener.handle_remove(FakeUdevDevice("/dev/input/js0"), manager, repo)
+    udev_listener.handle_remove(FakeUdevDevice("/dev/input/js0"), manager, repo, features)
 
     assert "Session ended" not in capsys.readouterr().out
+
+def test_handle_remove_persists_features(stub_reader, repo, features):
+    """Ending a session writes the extracted features back to its row.
+
+    The reader stores events as they arrive but never touches the session row,
+    so the aggregates only exist once handle_remove runs the extraction; a
+    session that disconnects without this stays permanently unscored.
+    """
+    manager = SessionManager()
+    udev_listener.handle_add(
+        FakeUdevDevice("/dev/input/event5", {"ID_INPUT_KEYBOARD": "1"}), manager, repo
+    )
+    session_id = manager.session_id_for("/dev/input/event5")
+    connected_at = repo.get_session(session_id).connected_at
+
+    # four key-downs, 100ms apart: enough delays for the interkey stats to apply
+    for offset, code in enumerate((KEY_A, KEY_B, KEY_C, KEY_BACKSPACE)):
+        for value in (1, 0):  # press then release
+            repo.save_event(
+                InputEvent(
+                    session_id=session_id,
+                    type=EV_KEY,
+                    code=code,
+                    value=value,
+                    timestamp=connected_at + 0.5 + offset * 0.1,
+                )
+            )
+
+    udev_listener.handle_remove(
+        FakeUdevDevice("/dev/input/event5"), manager, repo, features
+    )
+
+    stored = repo.get_session(session_id)
+    assert stored.event_count == 8
+    assert stored.backspace_count == 1
+    assert stored.avg_interkey_delay_ms == pytest.approx(100, abs=1)
+    assert stored.time_to_first_keystroke_ms == pytest.approx(500, abs=1)

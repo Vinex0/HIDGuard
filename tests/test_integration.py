@@ -1,13 +1,14 @@
 import threading
 import time
 
-import pyudev
 import pytest
+import pyudev
 from evdev import UInput
 from evdev import ecodes as e
 
 from hidguard.collectors.session_manager import SessionManager
 from hidguard.collectors.udev_listener import listen
+from hidguard.features.features import Features
 from hidguard.storage.sqlite_repo import SqliteRepo
 
 
@@ -48,9 +49,10 @@ def test_virtual_keyboard_triggers_add_and_remove(capsys, tmp_path):
     """
     session_manager = SessionManager()
     repo = SqliteRepo(tmp_path / "hidguard.db")
+    features = Features(repo)
 
     listener_thread = threading.Thread(
-        target=listen, args=(session_manager, repo), daemon=True
+        target=listen, args=(session_manager, repo, features), daemon=True
     )
     listener_thread.start()
     time.sleep(0.5)  # give the udev monitor time to start polling
