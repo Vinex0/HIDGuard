@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Harmless HID-injection simulator for demonstrating HIDGuard end to end.
 
-This is a standalone tool that knows nothing about HIDGuard. It creates a real
-virtual keyboard through /dev/uinput -- the same thing a Rubber Ducky does when
-it enumerates as a HID device -- and types a preset payload into whatever window
-has focus. The kernel and udev treat it exactly like plugged-in hardware, so
-HIDGuard sees it through its normal udev -> session -> detection pipeline rather
-than through any test seam.
+Although it ships in the package for one-command installation, this module
+imports nothing from HIDGuard's own detection or storage -- it only writes to
+the kernel. It creates a real virtual keyboard through /dev/uinput, the same
+thing a Rubber Ducky does when it enumerates as a HID device, and types a preset
+payload into whatever window has focus. The kernel and udev treat it exactly
+like plugged-in hardware, so HIDGuard sees it through its normal udev -> session
+-> detection pipeline rather than through any test seam.
 
 The effect is deliberately visible and harmless: focus a text editor before the
 countdown ends and the payload appears there at machine speed while HIDGuard
@@ -14,7 +15,7 @@ flags the session. No Enter is sent, so nothing is ever executed.
 
 Requires write access to /dev/uinput, which is root-only on most systems:
 
-    sudo .venv/bin/python tools/ducky.py --payload superhuman
+    sudo .venv/bin/hidguard simulate --payload superhuman
 
 Aim it at a scratch editor or an empty virtual terminal (Ctrl+Alt+F3), never at
 a shell you care about.
@@ -201,8 +202,8 @@ def run(preset: Preset, countdown: int | None) -> None:
     print("Done. The virtual keyboard is gone; check HIDGuard's verdict.")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register the simulator's flags, shared by main() and the hidguard CLI."""
     parser.add_argument(
         "--payload", choices=PRESETS, default="superhuman",
         help="which attack profile to replay (default: superhuman)",
@@ -212,8 +213,9 @@ def main() -> None:
         help="seconds to focus the target window before typing (default: per preset)",
     )
     parser.add_argument("--list", action="store_true", help="describe the presets and exit")
-    args = parser.parse_args()
 
+
+def dispatch(args: argparse.Namespace) -> None:
     if args.list:
         for name, preset in PRESETS.items():
             print(f"{name:12} {preset.description}")
@@ -222,6 +224,12 @@ def main() -> None:
     preset = PRESETS[args.payload]
     print(f"Payload: {args.payload} -- {preset.description}\n")
     run(preset, args.countdown)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_arguments(parser)
+    dispatch(parser.parse_args())
 
 
 if __name__ == "__main__":

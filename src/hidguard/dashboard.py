@@ -114,8 +114,8 @@ def run(db_path, limit: int, interval: float) -> None:
         repo.close()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register the dashboard's flags, shared by main() and the hidguard CLI."""
     parser.add_argument(
         "--limit", type=int, default=DEFAULT_LIMIT,
         help=f"how many recent sessions to show (default: {DEFAULT_LIMIT})",
@@ -124,8 +124,16 @@ def main() -> None:
         "--interval", type=float, default=REFRESH_INTERVAL_S,
         help=f"seconds between refreshes (default: {REFRESH_INTERVAL_S})",
     )
-    args = parser.parse_args()
+
+
+def dispatch(args: argparse.Namespace) -> None:
     run(get_db_path(), args.limit, args.interval)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    add_arguments(parser)
+    dispatch(parser.parse_args())
 
 
 if __name__ == "__main__":

@@ -10,6 +10,15 @@ from hidguard.models.device_model import Device
 from hidguard.models.session import Session
 from hidguard.storage.sqlite_repo import SqliteRepo
 
+# The daemon's status lines. Silenced by the combined dashboard mode, which owns
+# the terminal with a live view and would be corrupted by stray prints.
+VERBOSE = True
+
+
+def _log(*args) -> None:
+    if VERBOSE:
+        print(*args)
+
 
 def handle_add(udev_device, session_manager: SessionManager, repo: SqliteRepo) -> None:
     node = udev_device.device_node
@@ -25,8 +34,8 @@ def handle_add(udev_device, session_manager: SessionManager, repo: SqliteRepo) -
     session = Session.start(device_id=device.id)
     repo.save_session(session)
 
-    print(f"New device: {device}")
-    print(f"Session started: {session}")
+    _log(f"New device: {device}")
+    _log(f"Session started: {session}")
 
     stop_event = threading.Event()
     thread = threading.Thread(
@@ -46,10 +55,10 @@ def handle_remove(udev_device, session_manager: SessionManager, repo: SqliteRepo
         repo.save_session(session)
         detection = evaluate(session)
         repo.save_detection(detection)
-        print(f"Session ended: {session.id}")
-        print(f"Verdict: {detection.verdict} (score {detection.score})")
+        _log(f"Session ended: {session.id}")
+        _log(f"Verdict: {detection.verdict} (score {detection.score})")
         for hit in detection.hits:
-            print(f"  - {hit.rule}: {hit.reason}")
+            _log(f"  - {hit.rule}: {hit.reason}")
 
 
 def listen(session_manager: SessionManager, repo: SqliteRepo) -> None:
@@ -57,7 +66,7 @@ def listen(session_manager: SessionManager, repo: SqliteRepo) -> None:
     monitor = pyudev.Monitor.from_netlink(context)
     monitor.filter_by(subsystem='input')
 
-    print("Listening for input device connections... (Ctrl+C to stop)\n")
+    _log("Listening for input device connections... (Ctrl+C to stop)\n")
 
     for udev_device in iter(monitor.poll, None):
         if udev_device.action == 'add':
