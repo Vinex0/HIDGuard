@@ -7,7 +7,19 @@ events in, numbers out -- so the statistics can be tested without a database.
 from itertools import pairwise
 from statistics import fmean, median, pstdev
 
-from evdev.ecodes import KEY_BACKSPACE
+from evdev.ecodes import (
+    KEY_BACKSPACE,
+    KEY_F2,
+    KEY_LEFTALT,
+    KEY_LEFTCTRL,
+    KEY_LEFTMETA,
+    KEY_LEFTSHIFT,
+    KEY_RIGHTALT,
+    KEY_RIGHTCTRL,
+    KEY_RIGHTMETA,
+    KEY_RIGHTSHIFT,
+    KEY_T,
+)
 
 from hidguard.models.input_event import InputEvent
 from hidguard.models.session import Session
@@ -22,6 +34,28 @@ BURST_MAX_GAP_MS = 50.0
 
 # Width of the window max_keys_per_second slides over the press timestamps.
 BURST_WINDOW_S = 1.0
+
+# Which side of the keyboard a modifier came from says nothing about intent, and
+# an injector picks a side by whatever its descriptor happens to emit.
+MODIFIER_ALIASES = {
+    KEY_RIGHTCTRL: KEY_LEFTCTRL,
+    KEY_RIGHTALT: KEY_LEFTALT,
+    KEY_RIGHTMETA: KEY_LEFTMETA,
+    KEY_RIGHTSHIFT: KEY_LEFTSHIFT,
+}
+
+# Held rather than typed, so these never complete a combo by themselves.
+MODIFIERS = frozenset({KEY_LEFTCTRL, KEY_LEFTALT, KEY_LEFTMETA, KEY_LEFTSHIFT})
+
+# The first move of practically every injection payload: open a terminal or a
+# run dialog. Written in normalised (left-hand) codes.
+LAUNCHER_COMBOS = frozenset(
+    {
+        frozenset({KEY_LEFTMETA}),  # GNOME/KDE overview
+        frozenset({KEY_LEFTCTRL, KEY_LEFTALT, KEY_T}),  # terminal
+        frozenset({KEY_LEFTALT, KEY_F2}),  # run dialog
+    }
+)
 
 
 def update_session(repo: SqliteRepo, session: Session) -> Session:
@@ -43,11 +77,13 @@ def extract(events: list[InputEvent], connected_at: float) -> dict:
     presses = [event for event in events if event.value == KEY_DOWN]
     delays_ms = [(b.timestamp - a.timestamp) * 1000 for a, b in pairwise(presses)]
     dwells_ms = dwell_times_ms(events)
+    launcher_ms = launcher_hotkey_after_ms(events, connected_at)
 
     # float rather than int|float: the counts widen harmlessly, and declaring the
     # union would make every later statistic an assignment error.
     features: dict[str, float] = {
         "event_count": len(events),
+        "keystroke_count": len(presses),
         "backspace_count": sum(1 for event in presses if event.code == KEY_BACKSPACE),
         "max_keys_per_second": max_keys_per_second([press.timestamp for press in presses]),
         "longest_burst_length": longest_burst_length(presses),
@@ -55,6 +91,11 @@ def extract(events: list[InputEvent], connected_at: float) -> dict:
 
     if presses:
         features["time_to_first_keystroke_ms"] = (presses[0].timestamp - connected_at) * 1000
+
+    # Explicitly against None, not truthiness: a combo pressed the instant the
+    # device enumerated measures zero, and that is the most damning value there is.
+    if launcher_ms is not None:
+        features["launcher_hotkey_after_ms"] = launcher_ms
 
     if delays_ms:
         features |= {
@@ -137,8 +178,48 @@ def longest_burst_length(presses: list[InputEvent]) -> int:
         gap_ms = (
             None if previous_timestamp is None else (press.timestamp - previous_timestamp) * 1000
         )
-        current = current + 1 if gap_ms is not None and gap_ms <= BURST_MAX_GAP_MS else 1
+        current= current + 1 if gap_ms is not None and gap_ms <= BURST_MAX_GAP_MS else 1
         previous_timestamp = press.timestamp
         longest = max(longest, current)
 
     return longest
+
+
+def launcher_hotkey_after_ms(events: list[InputEvent], connected_at: float) -> float | None:
+    """Time from enumeration to the first launcher hotkey, or None if none was typed.
+
+    A combo is the set of modifiers held when a normal key goes down, which is
+    why the modifiers themselves are tracked rather than the event order: an
+    injector releases Ctrl and Alt in whatever order its report layout implies.
+
+    Modifiers pressed alone are the awkward case, since nothing follows them to
+    complete a combo. They are recognised on release instead, and only while
+    nothing else was pressed in between -- Meta alone opens the overview, but
+    the Meta of Meta+A is a modifier and must not count. The press timestamp is
+    reported for those, since that is when the keyboard acted.
+
+    Only the first hit is reported; what a payload does after opening its
+    terminal is a different question than how fast it got there.
+    """
+    held: set[int] = set()
+    solo: tuple[int, float] | None = None  # a modifier held with nothing else down
+
+    for event in events:
+        code = MODIFIER_ALIASES.get(event.code, event.code)
+        is_modifier = code in MODIFIERS
+
+        if event.value == KEY_DOWN:
+            solo = (code, event.timestamp) if is_modifier and not held else None
+            if is_modifier:
+                held.add(code)
+            elif frozenset(held | {code}) in LAUNCHER_COMBOS:
+                return (event.timestamp - connected_at) * 1000
+
+        elif event.value == KEY_UP and is_modifier:
+            held.discard(code)
+            if solo is not None and solo[0] == code:
+                if frozenset({code}) in LAUNCHER_COMBOS:
+                    return (solo[1] - connected_at) * 1000
+                solo = None
+
+    return None

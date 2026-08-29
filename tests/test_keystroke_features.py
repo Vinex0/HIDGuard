@@ -7,7 +7,19 @@ event list, so none of it needs a repo, a session row, or a device.
 from uuid import uuid4
 
 import pytest
-from evdev.ecodes import EV_KEY, KEY_A, KEY_B, KEY_BACKSPACE
+from evdev.ecodes import (
+    EV_KEY,
+    KEY_A,
+    KEY_B,
+    KEY_BACKSPACE,
+    KEY_F2,
+    KEY_LEFTALT,
+    KEY_LEFTCTRL,
+    KEY_LEFTMETA,
+    KEY_RIGHTALT,
+    KEY_RIGHTCTRL,
+    KEY_T,
+)
 
 from hidguard.features import keystroke
 from hidguard.features.keystroke import KEY_DOWN, KEY_REPEAT, KEY_UP
@@ -152,6 +164,155 @@ def test_longest_burst_of_one_slow_typist_is_one():
 
 def test_longest_burst_of_no_presses_is_zero():
     assert keystroke.longest_burst_length([]) == 0
+
+
+def test_launcher_detects_the_terminal_combo():
+    """Ctrl+Alt+T is timed from the press that completes it.
+
+    The modifiers only qualify the keystroke; what the payload actually did is
+    press T, and that is the moment worth comparing against enumeration.
+    """
+    events = [
+        event(KEY_LEFTCTRL, KEY_DOWN, 1.00),
+        event(KEY_LEFTALT, KEY_DOWN, 1.01),
+        event(KEY_T, KEY_DOWN, 1.50),
+        event(KEY_T, KEY_UP, 1.55),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) == pytest.approx(1000, abs=1)
+
+
+def test_launcher_normalises_right_hand_modifiers():
+    """The same combo counts whichever Ctrl and Alt the device reports.
+
+    Which side a modifier comes from is a property of the descriptor an injector
+    happens to emit, not of what was typed, so both map onto the left-hand codes.
+    """
+    events = [
+        event(KEY_RIGHTCTRL, KEY_DOWN, 1.00),
+        event(KEY_RIGHTALT, KEY_DOWN, 1.01),
+        event(KEY_T, KEY_DOWN, 1.50),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) == pytest.approx(1000, abs=1)
+
+
+def test_launcher_detects_meta_pressed_alone():
+    """Meta on its own opens the overview and is recognised on release.
+
+    Nothing follows a bare modifier to complete a combo, so the hit can only be
+    called once the key comes back up with nothing pressed in between. The press
+    timestamp is what gets reported -- that is when the keyboard acted.
+    """
+    events = [
+        event(KEY_LEFTMETA, KEY_DOWN, 1.00),
+        event(KEY_LEFTMETA, KEY_UP, 1.20),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) == pytest.approx(500, abs=1)
+
+
+def test_launcher_ignores_meta_held_as_a_modifier():
+    """Meta+A is not a bare Meta, even though Meta goes down and later up.
+
+    Window managers bind dozens of Meta combos, so counting every Meta release
+    would make the feature fire on ordinary desktop use.
+    """
+    events = [
+        event(KEY_LEFTMETA, KEY_DOWN, 1.00),
+        event(KEY_A, KEY_DOWN, 1.10),
+        event(KEY_A, KEY_UP, 1.15),
+        event(KEY_LEFTMETA, KEY_UP, 1.20),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) is None
+
+
+def test_launcher_ignores_combos_outside_the_table():
+    """Ctrl+T is a browser tab, not a launcher, and Ctrl alone is nothing."""
+    events = [
+        event(KEY_LEFTCTRL, KEY_DOWN, 1.00),
+        event(KEY_T, KEY_DOWN, 1.05),
+        event(KEY_T, KEY_UP, 1.10),
+        event(KEY_LEFTCTRL, KEY_UP, 1.15),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) is None
+
+
+def test_launcher_reports_the_first_hit():
+    """Only the earliest launcher counts.
+
+    The feature answers how quickly the device reached for a launcher; what a
+    payload opens afterwards is a different question.
+    """
+    events = [
+        event(KEY_LEFTALT, KEY_DOWN, 1.00),
+        event(KEY_F2, KEY_DOWN, 1.10),
+        event(KEY_F2, KEY_UP, 1.15),
+        event(KEY_LEFTALT, KEY_UP, 1.20),
+        event(KEY_LEFTMETA, KEY_DOWN, 3.00),
+        event(KEY_LEFTMETA, KEY_UP, 3.10),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) == pytest.approx(600, abs=1)
+
+
+def test_launcher_survives_a_release_without_a_press():
+    """A modifier released before the reader attached is not a bare press.
+
+    Same mid-stream attach the dwell pairing has to tolerate: the first event of
+    a session can be the release of a key that went down earlier.
+    """
+    events = [
+        event(KEY_LEFTMETA, KEY_UP, 1.00),
+        event(KEY_A, KEY_DOWN, 1.50),
+    ]
+
+    assert keystroke.launcher_hotkey_after_ms(events, 0.50) is None
+
+
+def test_extract_counts_keystrokes_not_events():
+    """keystroke_count counts presses; event_count counts everything.
+
+    A rule threshold phrased in keystrokes would otherwise be halved by the
+    releases, since every press brings its own release along.
+    """
+    events = [
+        event(KEY_A, KEY_DOWN, 1.00),
+        event(KEY_A, KEY_UP, 1.05),
+        event(KEY_B, KEY_DOWN, 1.10),
+        event(KEY_B, KEY_REPEAT, 1.60),
+        event(KEY_B, KEY_UP, 2.00),
+    ]
+
+    features = keystroke.extract(events, connected_at=0.5)
+
+    assert features["event_count"] == 5
+    assert features["keystroke_count"] == 2
+
+
+def test_extract_leaves_the_launcher_field_out_when_none_was_typed():
+    """No launcher means an absent field, not a zero.
+
+    Zero is a real measurement here -- a combo pressed the instant the device
+    enumerated -- so it cannot double as 'nothing found'.
+    """
+    features = keystroke.extract(presses_at(1.0, 1.1), connected_at=0.5)
+
+    assert "launcher_hotkey_after_ms" not in features
+
+
+def test_extract_reports_the_launcher_delay():
+    events = [
+        event(KEY_LEFTCTRL, KEY_DOWN, 1.00),
+        event(KEY_LEFTALT, KEY_DOWN, 1.01),
+        event(KEY_T, KEY_DOWN, 1.50),
+    ]
+
+    features = keystroke.extract(events, connected_at=0.50)
+
+    assert features["launcher_hotkey_after_ms"] == pytest.approx(1000, abs=1)
 
 
 def test_extract_leaves_undefined_statistics_out():

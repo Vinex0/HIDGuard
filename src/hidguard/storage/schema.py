@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     max_keys_per_second INTEGER,
     longest_burst_length INTEGER,
     time_to_first_keystroke_ms REAL,
+    launcher_hotkey_after_ms REAL,
+    keystroke_count INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (device_id) REFERENCES devices(id)
 ); 
 

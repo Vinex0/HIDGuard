@@ -44,14 +44,14 @@ class SqliteRepo:
                     max_interkey_delay_ms, median_interkey_delay_ms,
                     avg_dwell_time_ms, std_dwell_time_ms,
                     backspace_count, max_keys_per_second, longest_burst_length,
-                    time_to_first_keystroke_ms
+                    time_to_first_keystroke_ms, launcher_hotkey_after_ms, keystroke_count
                 ) VALUES (
                     :id, :device_id, :connected_at, :disconnected_at, :event_count,
                     :avg_interkey_delay_ms, :std_interkey_delay_ms, :min_interkey_delay_ms,
                     :max_interkey_delay_ms, :median_interkey_delay_ms,
                     :avg_dwell_time_ms, :std_dwell_time_ms,
                     :backspace_count, :max_keys_per_second, :longest_burst_length,
-                    :time_to_first_keystroke_ms
+                    :time_to_first_keystroke_ms, :launcher_hotkey_after_ms, :keystroke_count
                 )
                 ON CONFLICT(id) DO UPDATE SET
                     disconnected_at = excluded.disconnected_at,
@@ -66,7 +66,9 @@ class SqliteRepo:
                     backspace_count = excluded.backspace_count,
                     max_keys_per_second = excluded.max_keys_per_second,
                     longest_burst_length = excluded.longest_burst_length,
-                    time_to_first_keystroke_ms = excluded.time_to_first_keystroke_ms
+                    time_to_first_keystroke_ms = excluded.time_to_first_keystroke_ms,
+                    launcher_hotkey_after_ms = excluded.launcher_hotkey_after_ms, 
+                    keystroke_count = excluded.keystroke_count
                 """,
                 data,
             )

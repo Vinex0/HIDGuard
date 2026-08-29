@@ -33,6 +33,8 @@ class Session(BaseModel):
 
     # Kontext
     time_to_first_keystroke_ms: float | None = None
+    launcher_hotkey_after_ms: float | None = None
+    keystroke_count: int = 0
 
     @classmethod
     def start(cls, device_id: str) -> Session:
