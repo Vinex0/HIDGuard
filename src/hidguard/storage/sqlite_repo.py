@@ -103,6 +103,7 @@ class SqliteRepo:
                 verdict = excluded.verdict,
                 reasons = excluded.reasons,
                 evaluated_at = excluded.evaluated_at
+                WHERE excluded.evaluated_at >= detections.evaluated_at
                 """,
                 data
             )

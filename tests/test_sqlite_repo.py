@@ -162,3 +162,29 @@ def test_save_detection_upserts(repo):
     assert len(all_detections) == 1
     assert all_detections[0].score == 80
     assert all_detections[0].verdict == "malicious"
+
+
+def test_save_detection_keeps_the_newer_row_against_a_stale_write(repo):
+    """A late scorer snapshot must not clobber a fresher detection.
+
+    The scorer works from a snapshot of the open sessions, so one taken just
+    before a session ends can reach save_detection after handle_remove has
+    written the final verdict. The upsert guards on evaluated_at, so the older
+    write is dropped rather than resurrecting the stale score.
+    """
+    repo.save_device(Device(id="dev-1"))
+    session = Session.start(device_id="dev-1")
+    repo.save_session(session)
+
+    final = Detection(
+        session_id=session.id, score=80, verdict="malicious", hits=[], evaluated_at=200.0
+    )
+    stale = Detection(
+        session_id=session.id, score=10, verdict="benign", hits=[], evaluated_at=100.0
+    )
+    repo.save_detection(final)
+    repo.save_detection(stale)  # arrives late, older timestamp
+
+    stored = repo.get_detection(session.id)
+    assert stored.score == 80
+    assert stored.verdict == "malicious"

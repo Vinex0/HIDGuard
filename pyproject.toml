@@ -8,6 +8,7 @@ dependencies = [
     "evdev>=1.9.3",
     "pydantic>=2.13.4",
     "pyudev>=0.24.4",
+    "rich>=14.0.0",
 ]
 
 [dependency-groups]

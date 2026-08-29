@@ -4,6 +4,7 @@ import pyudev
 
 from hidguard.collectors.event_reader import read_evdev_events
 from hidguard.collectors.session_manager import SessionManager
+from hidguard.detection.engine import evaluate
 from hidguard.features import keystroke
 from hidguard.models.device_model import Device
 from hidguard.models.session import Session
@@ -41,8 +42,14 @@ def handle_remove(udev_device, session_manager: SessionManager, repo: SqliteRepo
     node = udev_device.device_node
     session = session_manager.unregister(node)
     if session:
-        repo.save_session(keystroke.update_session(repo, session))
+        session = keystroke.update_session(repo, session)
+        repo.save_session(session)
+        detection = evaluate(session)
+        repo.save_detection(detection)
         print(f"Session ended: {session.id}")
+        print(f"Verdict: {detection.verdict} (score {detection.score})")
+        for hit in detection.hits:
+            print(f"  - {hit.rule}: {hit.reason}")
 
 
 def listen(session_manager: SessionManager, repo: SqliteRepo) -> None:
