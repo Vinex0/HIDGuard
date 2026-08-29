@@ -127,6 +127,33 @@ def dwell_times_ms(events: list[InputEvent]) -> list[float]:
     Keys that autorepeat are excluded. Their dwell measures how long someone
     leaned on a key rather than how they type, and one of them is long enough
     to move the mean by an order of magnitude.
+
+    'he' typed with overlapping hands -- h down, e down, h up, e up -- still
+    pairs each key with its own release rather than with the next event:
+
+    >>> from uuid import UUID
+    >>> def ev(code, value, timestamp):
+    ...     return InputEvent(
+    ...         session_id=UUID(int=0), type=1, code=code, value=value, timestamp=timestamp
+    ...     )
+    >>> H, E = 35, 18
+    >>> [
+    ...     round(dwell)
+    ...     for dwell in dwell_times_ms(
+    ...         [
+    ...             ev(H, KEY_DOWN, 0.00),
+    ...             ev(E, KEY_DOWN, 0.05),
+    ...             ev(H, KEY_UP, 0.10),
+    ...             ev(E, KEY_UP, 0.20),
+    ...         ]
+    ...     )
+    ... ]
+    [100, 150]
+
+    A release with no matching press is dropped rather than guessed at:
+
+    >>> dwell_times_ms([ev(H, KEY_UP, 0.10)])
+    []
     """
     pressed_at: dict[int, float] = {}
     repeating: set[int] = set()
@@ -153,6 +180,11 @@ def max_keys_per_second(press_times: list[float]) -> int:
     Slides the window rather than bucketing into fixed seconds: a flurry of
     twenty keystrokes straddling a bucket boundary would otherwise read as two
     unremarkable halves.
+
+    >>> max_keys_per_second([0.0, 0.1, 0.2, 1.5, 1.6])
+    3
+    >>> max_keys_per_second([])
+    0
     """
     busiest = 0
     window_start = 0
@@ -170,6 +202,19 @@ def longest_burst_length(presses: list[InputEvent]) -> int:
 
     Counted in keystrokes rather than gaps, so a run of n fast gaps is n+1
     presses and a lone keystroke is a burst of one.
+
+    Three presses 10ms apart are one burst of three; the gap to the fourth is
+    far over BURST_MAX_GAP_MS, so it starts a new run rather than extending it:
+
+    >>> from uuid import UUID
+    >>> def press(timestamp):
+    ...     return InputEvent(
+    ...         session_id=UUID(int=0), type=1, code=30, value=KEY_DOWN, timestamp=timestamp
+    ...     )
+    >>> longest_burst_length([press(0.00), press(0.01), press(0.02), press(1.00)])
+    3
+    >>> longest_burst_length([])
+    0
     """
     longest = current = 0
     previous_timestamp = None
@@ -178,7 +223,7 @@ def longest_burst_length(presses: list[InputEvent]) -> int:
         gap_ms = (
             None if previous_timestamp is None else (press.timestamp - previous_timestamp) * 1000
         )
-        current= current + 1 if gap_ms is not None and gap_ms <= BURST_MAX_GAP_MS else 1
+        current = current + 1 if gap_ms is not None and gap_ms <= BURST_MAX_GAP_MS else 1
         previous_timestamp = press.timestamp
         longest = max(longest, current)
 

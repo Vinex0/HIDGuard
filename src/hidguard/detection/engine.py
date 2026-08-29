@@ -156,9 +156,7 @@ def _long_burst(session: Session) -> RuleHit | None:
     length = session.longest_burst_length
     if length is None or length < LONG_BURST_LENGTH:
         return None
-    return RuleHit(
-        rule="long_burst", score=15, reason=f"{length} keystrokes in one unbroken burst"
-    )
+    return RuleHit(rule="long_burst", score=15, reason=f"{length} keystrokes in one unbroken burst")
 
 
 def _launcher_sequence(session: Session) -> RuleHit | None:
@@ -202,6 +200,32 @@ def evaluate(session: Session) -> Detection:
     Rules that find their input missing return None: the feature extraction
     leaves statistics NULL when there was nothing to compute them from, and that
     absence must not be read as a measurement of zero.
+
+    A session too short to say anything is reported as such rather than scored:
+
+    >>> from uuid import UUID
+    >>> quiet = Session(
+    ...     id=UUID(int=0), device_id="dev-1", connected_at=0.0, keystroke_count=3
+    ... )
+    >>> evaluate(quiet).verdict
+    'insufficient_data'
+
+    An injected payload trips several independent rules at once:
+
+    >>> injected = Session(
+    ...     id=UUID(int=0),
+    ...     device_id="dev-1",
+    ...     connected_at=0.0,
+    ...     keystroke_count=80,
+    ...     time_to_first_keystroke_ms=200.0,
+    ...     median_interkey_delay_ms=12.0,
+    ...     std_interkey_delay_ms=0.5,
+    ... )
+    >>> detection = evaluate(injected)
+    >>> [hit.rule for hit in detection.hits]
+    ['instant_typing', 'superhuman_speed', 'no_jitter', 'no_corrections']
+    >>> detection.verdict
+    'malicious'
     """
     if session.keystroke_count < MIN_KEYSTROKES:
         return Detection(session_id=session.id, score=0, verdict="insufficient_data")
@@ -219,6 +243,15 @@ def evaluate(session: Session) -> Detection:
 
 
 def _verdict(score: int) -> Literal["benign", "suspicious", "malicious"]:
+    """The label for a total score, at the thresholds documented above.
+
+    >>> _verdict(0), _verdict(SUSPICIOUS_SCORE - 1)
+    ('benign', 'benign')
+    >>> _verdict(SUSPICIOUS_SCORE), _verdict(MALICIOUS_SCORE - 1)
+    ('suspicious', 'suspicious')
+    >>> _verdict(MALICIOUS_SCORE)
+    'malicious'
+    """
     if score >= MALICIOUS_SCORE:
         return "malicious"
     if score >= SUSPICIOUS_SCORE:
