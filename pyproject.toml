@@ -1,7 +1,7 @@
 [project]
 name = "hidguard"
 version = "0.1.0"
-description = "Add your description here"
+description = "Behavior-based detection of HID-injection attacks from keystroke dynamics"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -27,6 +27,22 @@ hidguard = "hidguard.cli:main_cli"
 requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"
 
+[tool.ruff]
+# The annotated threshold blocks and the reasoning comments read badly rewrapped
+# at 88; 100 is what this code was written to and what the formatter now enforces.
+line-length = 100
+
+[tool.ruff.lint]
+# Beyond ruff's default E4/E7/E9/F: import order (I), pycodestyle warnings (W),
+# outdated idioms (UP), likely bugs (B), and needless complexity (SIM).
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.interrogate]
+# The gate the project is held to. Actual coverage is well above it; run with
+# -v for the per-file breakdown of what is still undocumented.
+fail-under = 20
+exclude = ["tests"]
+
 [tool.mypy]
 # pyudev ships no py.typed marker, so its imports are untyped by necessity.
 [[tool.mypy.overrides]]
@@ -34,7 +50,10 @@ module = ["pyudev.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "-m 'not integration'"
+# --doctest-modules collects the examples in src/ alongside the unit tests in
+# tests/, so a docstring that drifts from the code fails the suite.
+testpaths = ["src", "tests"]
+addopts = "-m 'not integration' --doctest-modules"
 markers = [
     "integration: requires /dev/uinput access, run explicitly",
 ]
