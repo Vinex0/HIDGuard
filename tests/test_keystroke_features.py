@@ -149,9 +149,14 @@ def test_longest_burst_counts_keystrokes_not_gaps():
 def test_longest_burst_resets_on_a_slow_gap():
     """A human-speed pause ends the burst and starts counting again."""
     presses = presses_at(
-        1.00, 1.02, 1.04,  # burst of 3
-        2.00,              # 960ms pause resets
-        2.01, 2.02, 2.03, 2.04,  # burst of 5
+        1.00,
+        1.02,
+        1.04,  # burst of 3
+        2.00,  # 960ms pause resets
+        2.01,
+        2.02,
+        2.03,
+        2.04,  # burst of 5
     )
 
     assert keystroke.longest_burst_length(presses) == 5
@@ -377,8 +382,9 @@ def test_update_session_reads_events_and_keeps_session_fields(repo):
 
     for offset, code in enumerate((KEY_A, KEY_B, KEY_BACKSPACE)):
         repo.save_event(
-            event(code, KEY_DOWN, session.connected_at + 0.5 + offset * 0.02)
-            .model_copy(update={"session_id": session.id})
+            event(code, KEY_DOWN, session.connected_at + 0.5 + offset * 0.02).model_copy(
+                update={"session_id": session.id}
+            )
         )
 
     updated = keystroke.update_session(repo, session)

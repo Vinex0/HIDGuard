@@ -1,5 +1,3 @@
-
-
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -19,5 +17,5 @@ class InputEvent(BaseModel):
             type=event.type,
             code=event.code,
             value=event.value,
-            timestamp=event.timestamp()
+            timestamp=event.timestamp(),
         )

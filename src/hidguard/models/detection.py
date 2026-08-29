@@ -12,6 +12,7 @@ class Detection(BaseModel):
     hits: list[RuleHit] = Field(default_factory=list)
     evaluated_at: float = Field(default_factory=time.time)
 
+
 class RuleHit(BaseModel):
     rule: str
     score: int

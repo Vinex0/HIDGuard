@@ -7,5 +7,3 @@ def get_db_path() -> Path:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     return data_dir / "hidguard.db"
-
-

@@ -49,9 +49,7 @@ def test_virtual_keyboard_triggers_add_and_remove(capsys, tmp_path):
     session_manager = SessionManager()
     repo = SqliteRepo(tmp_path / "hidguard.db")
 
-    listener_thread = threading.Thread(
-        target=listen, args=(session_manager, repo), daemon=True
-    )
+    listener_thread = threading.Thread(target=listen, args=(session_manager, repo), daemon=True)
     listener_thread.start()
     time.sleep(0.5)  # give the udev monitor time to start polling
 

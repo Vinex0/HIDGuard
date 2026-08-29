@@ -12,7 +12,13 @@ class SessionManager:
         self._sessions: dict[str, Session] = {}
         self._lock = threading.Lock()
 
-    def register(self, node: str, session: Session, thread: threading.Thread, stop_event: threading.Event) -> None:
+    def register(
+        self,
+        node: str,
+        session: Session,
+        thread: threading.Thread,
+        stop_event: threading.Event,
+    ) -> None:
         """Tracks a session and its reader thread against a device node.
 
         Any registration already held for the node is retired first: device

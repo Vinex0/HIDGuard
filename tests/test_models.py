@@ -16,6 +16,7 @@ from hidguard.models.session import Session
 
 class FakeUdevDevice:
     """Minimal stand-in for pyudev.Device."""
+
     def __init__(self, properties: dict, sys_path: str = "/sys/fake/path"):
         self.properties = properties
         self.sys_path = sys_path
@@ -23,6 +24,7 @@ class FakeUdevDevice:
 
 class FakeEvdevEvent:
     """Minimal stand-in for evdev.InputEvent."""
+
     def __init__(self, type_, code, value, ts=1234.5):
         self.type = type_
         self.code = code
@@ -39,13 +41,15 @@ def test_device_from_udev_builds_composite_id():
     Also checks that the human-readable ID_VENDOR property is carried over
     into vendor_name, separately from the vendor_id used to build the id.
     """
-    udev_device = FakeUdevDevice({
-        "ID_VENDOR_ID": "046d",
-        "ID_MODEL_ID": "c31c",
-        "ID_VENDOR": "Logitech",
-        "ID_MODEL": "Keyboard",
-        "ID_SERIAL": "abc123",
-    })
+    udev_device = FakeUdevDevice(
+        {
+            "ID_VENDOR_ID": "046d",
+            "ID_MODEL_ID": "c31c",
+            "ID_VENDOR": "Logitech",
+            "ID_MODEL": "Keyboard",
+            "ID_SERIAL": "abc123",
+        }
+    )
 
     device = Device.from_udev(udev_device)
 

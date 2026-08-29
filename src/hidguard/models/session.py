@@ -40,6 +40,5 @@ class Session(BaseModel):
     def start(cls, device_id: str) -> Session:
         return cls(id=uuid4(), device_id=device_id, connected_at=time.time())
 
-    
     def end(self) -> None:
         self.disconnected_at = time.time()

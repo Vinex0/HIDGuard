@@ -14,6 +14,7 @@ from hidguard.models.session import Session
 
 class FakeEvdevEvent:
     """Minimal stand-in for evdev.InputEvent."""
+
     def __init__(self, type_, code, value, ts=1234.5):
         self.type = type_
         self.code = code
@@ -26,6 +27,7 @@ class FakeEvdevEvent:
 
 class FakeInputDevice:
     """Minimal stand-in for evdev.InputDevice, replaying a fixed event list."""
+
     def __init__(self, events):
         self.name = "fake-keyboard"
         self._events = events
@@ -73,9 +75,7 @@ def test_read_evdev_events_reports_unopenable_device_and_returns(capsys, repo):
     """
     session = Session.start(device_id="dev-1")
 
-    read_evdev_events(
-        "/dev/input/event-does-not-exist", threading.Event(), session.id, repo
-    )
+    read_evdev_events("/dev/input/event-does-not-exist", threading.Event(), session.id, repo)
 
     output = capsys.readouterr().out
     assert "Could not open" in output

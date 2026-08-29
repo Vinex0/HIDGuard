@@ -136,9 +136,7 @@ def test_too_few_keystrokes_short_circuits_every_rule():
     key right after plugging a keyboard in is what everybody does, and there is
     no evidence yet to weigh it against.
     """
-    detection = engine.evaluate(
-        session_with(keystroke_count=4, time_to_first_keystroke_ms=100.0)
-    )
+    detection = engine.evaluate(session_with(keystroke_count=4, time_to_first_keystroke_ms=100.0))
 
     assert detection.verdict == "insufficient_data"
     assert detection.score == 0
@@ -152,9 +150,7 @@ def test_statistics_gate_holds_back_only_the_distribution_rules():
     gaps happened to land, so no_jitter waits for ten keystrokes -- but a burst
     of 25 keys in a second is a direct measurement and needs no such patience.
     """
-    session = session_with(
-        keystroke_count=7, std_interkey_delay_ms=1.0, max_keys_per_second=25
-    )
+    session = session_with(keystroke_count=7, std_interkey_delay_ms=1.0, max_keys_per_second=25)
 
     assert hit_for("no_jitter", session) is None
     assert score_of("burst_rate", session) == 20

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     launcher_hotkey_after_ms REAL,
     keystroke_count INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (device_id) REFERENCES devices(id)
-); 
+);
 
 CREATE TABLE IF NOT EXISTS input_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

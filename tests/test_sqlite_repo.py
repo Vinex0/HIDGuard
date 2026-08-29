@@ -36,7 +36,9 @@ def test_save_event(repo):
 
     repo.save_event(event)
 
-    row = repo._conn.execute("SELECT * FROM input_events WHERE session_id = ?", (str(session.id),)).fetchone()
+    row = repo._conn.execute(
+        "SELECT * FROM input_events WHERE session_id = ?", (str(session.id),)
+    ).fetchone()
     assert row is not None
 
 
@@ -63,8 +65,7 @@ def test_list_session_newest_first_and_limit(repo):
     capped by limit."""
     repo.save_device(Device(id="dev-1"))
     sessions = [
-        Session(id=uuid4(), device_id="dev-1", connected_at=t)
-        for t in (100.0, 200.0, 300.0)
+        Session(id=uuid4(), device_id="dev-1", connected_at=t) for t in (100.0, 200.0, 300.0)
     ]
     for session in sessions:
         repo.save_session(session)
@@ -154,9 +155,7 @@ def test_save_detection_upserts(repo):
     repo.save_session(session)
     repo.save_detection(Detection(session_id=session.id, score=20, verdict="benign", hits=[]))
 
-    repo.save_detection(
-        Detection(session_id=session.id, score=80, verdict="malicious", hits=[])
-    )
+    repo.save_detection(Detection(session_id=session.id, score=80, verdict="malicious", hits=[]))
 
     all_detections = repo.list_detections()
     assert len(all_detections) == 1
@@ -177,7 +176,11 @@ def test_save_detection_keeps_the_newer_row_against_a_stale_write(repo):
     repo.save_session(session)
 
     final = Detection(
-        session_id=session.id, score=80, verdict="malicious", hits=[], evaluated_at=200.0
+        session_id=session.id,
+        score=80,
+        verdict="malicious",
+        hits=[],
+        evaluated_at=200.0,
     )
     stale = Detection(
         session_id=session.id, score=10, verdict="benign", hits=[], evaluated_at=100.0
