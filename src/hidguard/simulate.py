@@ -31,19 +31,39 @@ from dataclasses import dataclass
 import pyudev
 from evdev import UInput
 from evdev import ecodes as e
+from evdev.uinput import UInputError
 
 # A subset of US-layout keys, enough for the demo strings below. Each printable
 # character maps to a key code and whether Shift has to be held for it; anything
 # outside this table is skipped with a warning rather than typed wrong.
 _SHIFTED = {
-    "!": "KEY_1", "@": "KEY_2", "#": "KEY_3", "$": "KEY_4", "%": "KEY_5",
-    "^": "KEY_6", "&": "KEY_7", "*": "KEY_8", "(": "KEY_9", ")": "KEY_0",
-    "_": "KEY_MINUS", "+": "KEY_EQUAL", ":": "KEY_SEMICOLON", '"': "KEY_APOSTROPHE",
-    "?": "KEY_SLASH", ">": "KEY_DOT", "<": "KEY_COMMA",
+    "!": "KEY_1",
+    "@": "KEY_2",
+    "#": "KEY_3",
+    "$": "KEY_4",
+    "%": "KEY_5",
+    "^": "KEY_6",
+    "&": "KEY_7",
+    "*": "KEY_8",
+    "(": "KEY_9",
+    ")": "KEY_0",
+    "_": "KEY_MINUS",
+    "+": "KEY_EQUAL",
+    ":": "KEY_SEMICOLON",
+    '"': "KEY_APOSTROPHE",
+    "?": "KEY_SLASH",
+    ">": "KEY_DOT",
+    "<": "KEY_COMMA",
 }
 _UNSHIFTED = {
-    " ": "KEY_SPACE", ".": "KEY_DOT", ",": "KEY_COMMA", "-": "KEY_MINUS",
-    "=": "KEY_EQUAL", ";": "KEY_SEMICOLON", "'": "KEY_APOSTROPHE", "/": "KEY_SLASH",
+    " ": "KEY_SPACE",
+    ".": "KEY_DOT",
+    ",": "KEY_COMMA",
+    "-": "KEY_MINUS",
+    "=": "KEY_EQUAL",
+    ";": "KEY_SEMICOLON",
+    "'": "KEY_APOSTROPHE",
+    "/": "KEY_SLASH",
 }
 
 
@@ -137,10 +157,14 @@ def _find_real_keyboard_node() -> str:
     sidesteps reverse-engineering that, which is why HIDGuard then sees the
     virtual device as a keyboard at all.
     """
-    context = pyudev.Context()
-    for device in context.list_devices(subsystem="input", ID_INPUT_KEYBOARD="1"):
-        if device.device_node:
-            return device.device_node
+    try:
+        context = pyudev.Context()
+        devices = context.list_devices(subsystem="input", ID_INPUT_KEYBOARD="1")
+        for device in devices:
+            if device.device_node:
+                return device.device_node
+    except OSError as error:
+        raise SystemExit(f"Could not enumerate input devices: {error}") from error
     raise SystemExit("No real keyboard found to clone; is one attached?")
 
 
@@ -179,17 +203,37 @@ def _type_message(ui: UInput, message: str, timing: Timing) -> None:
 
 
 def run(preset: Preset, countdown: int | None) -> None:
+    """Enumerates a virtual keyboard, waits out the countdown, types the payload.
+
+    Raises:
+        SystemExit: no keyboard to clone, or /dev/uinput is not writable -- both
+            are things the person running it has to fix, so they are reported as
+            a message rather than a traceback.
+    """
     if countdown is None:
         countdown = preset.countdown
     node = _find_real_keyboard_node()
     print(f"Cloning capabilities from {node} ...")
-    with UInput.from_device(node, name="hidguard-ducky") as ui:
+    try:
+        ui = UInput.from_device(node, name="hidguard-ducky")
+    except (OSError, UInputError) as error:
+        raise SystemExit(
+            f"Could not create the virtual keyboard: {error}. "
+            "Writing to /dev/uinput needs root -- try "
+            "'sudo .venv/bin/hidguard simulate'."
+        ) from error
+
+    with ui:
         # from_device copies the source's key set; Shift and the launcher combo
         # are part of any real keyboard's capabilities, so nothing extra needed.
         time.sleep(1)  # let udev register the device and HIDGuard open a session
 
         for remaining in range(countdown, 0, -1):
-            print(f"  focus your target window... typing in {remaining}s", end="\r", flush=True)
+            print(
+                f"  focus your target window... typing in {remaining}s",
+                end="\r",
+                flush=True,
+            )
             time.sleep(1)
         print("\nTyping now.")
 
@@ -202,14 +246,41 @@ def run(preset: Preset, countdown: int | None) -> None:
     print("Done. The virtual keyboard is gone; check HIDGuard's verdict.")
 
 
+def _countdown_seconds(value: str) -> int:
+    """An argparse type for the countdown: whole seconds, never negative.
+
+    A negative countdown would not crash -- the loop simply would not run --
+    but it would silently type at once, which is not what the flag promised.
+
+    >>> _countdown_seconds("0")
+    0
+    >>> _countdown_seconds("later")
+    Traceback (most recent call last):
+    argparse.ArgumentTypeError: expected a whole number of seconds, got 'later'
+    """
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"expected a whole number of seconds, got {value!r}"
+        ) from None
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(f"the countdown cannot be negative, got {value!r}")
+    return parsed
+
+
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Register the simulator's flags, shared by main() and the hidguard CLI."""
     parser.add_argument(
-        "--payload", choices=PRESETS, default="superhuman",
+        "--payload",
+        choices=PRESETS,
+        default="superhuman",
         help="which attack profile to replay (default: superhuman)",
     )
     parser.add_argument(
-        "--countdown", type=int, default=None,
+        "--countdown",
+        type=_countdown_seconds,
+        default=None,
         help="seconds to focus the target window before typing (default: per preset)",
     )
     parser.add_argument("--list", action="store_true", help="describe the presets and exit")

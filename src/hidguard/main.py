@@ -6,6 +6,7 @@ from hidguard.collectors.session_manager import SessionManager
 from hidguard.collectors.udev_listener import listen
 from hidguard.detection import scorer
 from hidguard.detection.engine import evaluate
+from hidguard.errors import StorageError
 from hidguard.features import keystroke
 from hidguard.storage.paths import get_db_path
 from hidguard.storage.sqlite_repo import SqliteRepo
@@ -16,15 +17,25 @@ def _finalize(session_manager: SessionManager, repo: SqliteRepo) -> None:
 
     Shared by both run modes: whichever way the daemon is stopped, each live
     session gets its authoritative final row before shutdown.
+
+    Runs from a finally block, including one entered because the database
+    already failed, so a storage error here is reported and shutdown continues.
+    Raising would replace whatever sent us here with a second failure and skip
+    the remaining sessions' final rows.
     """
     for session in session_manager.unregister_all():
-        session = keystroke.update_session(repo, session)
-        repo.save_session(session)
-        repo.save_detection(evaluate(session))
+        try:
+            session = keystroke.update_session(repo, session)
+            repo.save_session(session)
+            repo.save_detection(evaluate(session))
+        except StorageError as error:
+            print(f"  [!] Could not write the final record for {session.id}: {error}")
     repo.close()
 
 
-def run(limit: int = dashboard.DEFAULT_LIMIT, interval: float = dashboard.REFRESH_INTERVAL_S) -> None:
+def run(
+    limit: int = dashboard.DEFAULT_LIMIT, interval: float = dashboard.REFRESH_INTERVAL_S
+) -> None:
     """Start the daemon and the live dashboard together in this terminal.
 
     The udev listener and the periodic scorer run in background threads while the
@@ -68,9 +79,10 @@ def run_headless() -> None:
         _finalize(session_manager, repo)
 
 
-def main():
+def main() -> None:
+    """Entry point for `python -m hidguard.main`; the CLI is the usual way in."""
     run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

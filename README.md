@@ -94,12 +94,27 @@ via a udev rule) is possible but out of scope here.
 ## Development
 
 ```bash
-uv run pytest          # unit tests (the /dev/uinput integration test is deselected by default)
-sudo uv run pytest -m integration #runs the deselected test
-uv run ruff check src tests
-uv run mypy src
+uv run pytest                      # unit tests and doctests (see below)
+sudo uv run pytest -m integration  # the /dev/uinput test, deselected by default
+uv run ruff check src tests        # linter
+uv run ruff format --check src tests
+uv run mypy src                    # type checker
+uv run interrogate -v src          # docstring coverage
 ```
+
+`pytest` collects both the unit tests in `tests/` and the doctests in `src/`
+(`--doctest-modules` is set in `pyproject.toml`), so a docstring whose example
+drifts from the code fails the suite.
 
 The scoring thresholds all live in one annotated block in
 [`detection/engine.py`](src/hidguard/detection/engine.py); each constant carries
 the reasoning that produced it.
+
+### Errors
+
+Failures the person running HIDGuard can do something about -- a database owned
+by another user, a daemon started without the privileges it needs -- are raised
+as [`HidGuardError`](src/hidguard/errors.py) subclasses and printed by the CLI
+as one line with exit code 1. Anything else keeps its traceback, so a bug still
+looks like a bug. Bad flag values never get that far: each flag validates its
+own input, and argparse reports them with usage and exit code 2.

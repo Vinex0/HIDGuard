@@ -1,6 +1,7 @@
 from evdev import InputDevice
 from pydantic import ValidationError
 
+from hidguard.errors import StorageError
 from hidguard.models.input_event import InputEvent
 from hidguard.storage.sqlite_repo import SqliteRepo
 
@@ -8,7 +9,14 @@ EV_KEY = 1
 
 
 def read_evdev_events(device_node, stop_event, session_id, repo: SqliteRepo):
-    """Runs in its own thread, printing events until stopped or unplugged."""
+    """Runs in its own thread, recording events until stopped or unplugged.
+
+    Nothing here may raise. It is a daemon thread with no one to catch for it,
+    so every failure that is not this thread's fault -- a node it may not open,
+    a device pulled mid-read, a database that has gone away -- is reported on
+    the terminal and ends this reader alone, leaving the rest of the daemon and
+    the other keyboards' sessions running.
+    """
     try:
         dev = InputDevice(device_node)
     except (OSError, PermissionError) as e:
@@ -32,5 +40,9 @@ def read_evdev_events(device_node, stop_event, session_id, repo: SqliteRepo):
     except OSError:
         # Device was unplugged mid-read
         pass
+    except StorageError as e:
+        # Nothing this reader can do about it, and nothing to be gained from
+        # spinning on a database that is not accepting writes.
+        print(f"  [!] Stopped reading {device_node}: {e}")
     finally:
         dev.close()

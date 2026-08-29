@@ -14,6 +14,7 @@ import threading
 
 from hidguard.collectors.session_manager import SessionManager
 from hidguard.detection.engine import evaluate
+from hidguard.errors import StorageError
 from hidguard.features import keystroke
 from hidguard.storage.sqlite_repo import SqliteRepo
 
@@ -39,14 +40,21 @@ def score_active_sessions(session_manager: SessionManager, repo: SqliteRepo) -> 
         repo.save_detection(evaluate(scored))
 
 
-def run(
-    session_manager: SessionManager, repo: SqliteRepo, stop_event: threading.Event
-) -> None:
+def run(session_manager: SessionManager, repo: SqliteRepo, stop_event: threading.Event) -> None:
     """Score open sessions every SCORE_INTERVAL_S until stop_event is set.
 
     Waits on the event rather than sleeping, so shutdown is immediate instead of
     blocking out the rest of the current interval.
+
+    A storage failure ends the loop rather than propagating: this is a daemon
+    thread, so an escaping exception would print a traceback over the dashboard
+    and stop the re-scoring silently anyway. The daemon keeps recording events,
+    and the final verdict on unplug is written by handle_remove regardless.
     """
     while not stop_event.is_set():
-        score_active_sessions(session_manager, repo)
+        try:
+            score_active_sessions(session_manager, repo)
+        except StorageError as error:
+            print(f"  [!] Stopped re-scoring open sessions: {error}")
+            return
         stop_event.wait(SCORE_INTERVAL_S)

@@ -17,6 +17,7 @@ the device is unplugged.
 
 import argparse
 import time
+from pathlib import Path
 from uuid import UUID
 
 from rich.console import Console
@@ -100,7 +101,12 @@ def render(repo: SqliteRepo, limit: int) -> Table:
     return table
 
 
-def run(db_path, limit: int, interval: float) -> None:
+def run(db_path: str | Path, limit: int, interval: float) -> None:
+    """Redraws the table every interval seconds until interrupted.
+
+    Raises:
+        StorageError: the database could not be opened or read.
+    """
     repo = SqliteRepo(db_path)
     console = Console()
     try:
@@ -114,14 +120,62 @@ def run(db_path, limit: int, interval: float) -> None:
         repo.close()
 
 
+def _positive_int(value: str) -> int:
+    """An argparse type for counts that have to be at least one.
+
+    argparse's plain int accepts 0 and -5 happily, and both reach SQLite as a
+    LIMIT that quietly means something other than what the flag said.
+
+    >>> _positive_int("15")
+    15
+    >>> _positive_int("0")
+    Traceback (most recent call last):
+    argparse.ArgumentTypeError: expected a whole number greater than 0, got '0'
+    """
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a whole number, got {value!r}") from None
+    if parsed < 1:
+        raise argparse.ArgumentTypeError(f"expected a whole number greater than 0, got {value!r}")
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    """An argparse type for durations in seconds that have to be above zero.
+
+    A negative interval used to travel as far as time.sleep and end the
+    dashboard with a ValueError several frames from the flag that caused it.
+
+    >>> _positive_float("0.5")
+    0.5
+    >>> _positive_float("-1")
+    Traceback (most recent call last):
+    argparse.ArgumentTypeError: expected a number of seconds greater than 0, got '-1'
+    """
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a number, got {value!r}") from None
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(
+            f"expected a number of seconds greater than 0, got {value!r}"
+        )
+    return parsed
+
+
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Register the dashboard's flags, shared by main() and the hidguard CLI."""
     parser.add_argument(
-        "--limit", type=int, default=DEFAULT_LIMIT,
+        "--limit",
+        type=_positive_int,
+        default=DEFAULT_LIMIT,
         help=f"how many recent sessions to show (default: {DEFAULT_LIMIT})",
     )
     parser.add_argument(
-        "--interval", type=float, default=REFRESH_INTERVAL_S,
+        "--interval",
+        type=_positive_float,
+        default=REFRESH_INTERVAL_S,
         help=f"seconds between refreshes (default: {REFRESH_INTERVAL_S})",
     )
 
