@@ -13,6 +13,9 @@ device is unplugged.
 
 ## Requirements
 
+- **Python 3.14 or newer** -- this is a hard requirement, not a preference; see
+  [Why 3.14](#why-314). You do **not** have to install it yourself: uv fetches
+  it for you (see [Install](#install)).
 - Linux with `/dev/uinput` and evdev input devices (a standard desktop)
 - [uv](https://docs.astral.sh/uv/) for dependency management and running
 - `sudo`, because reading input devices and creating a virtual keyboard both
@@ -24,7 +27,44 @@ device is unplugged.
 uv sync
 ```
 
-This creates `.venv/` and installs the `hidguard` command into it.
+This creates `.venv/` with Python 3.14 and installs the `hidguard` command into
+it. `requires-python = ">=3.14"` in `pyproject.toml` and the pinned `3.14` in
+`.python-version` are what uv reads to pick the interpreter.
+
+**If your system Python is older, uv normally downloads 3.14 on its own** and
+`uv sync` just works. One case needs a single extra command: distribution
+packages of uv (Fedora's and RHEL's `uv` RPM, for instance) ship
+`python-downloads = "manual"` in `/etc/uv/uv.toml`, which switches that
+automatic download off. `uv sync` then stops with
+
+```
+error: No interpreter found for Python 3.14 in search path or managed installations
+```
+
+and the fix is exactly what the message hints at:
+
+```bash
+uv python install 3.14   # a few seconds, no root needed
+uv sync
+```
+
+uv installs it privately under `~/.local/share/uv/python/`; your system Python
+is left untouched.
+
+### Why 3.14
+
+The models under [`models/`](src/hidguard/models/) rely on
+[PEP 649](https://peps.python.org/pep-0649/) deferred annotation evaluation,
+which became the default in 3.14. `Detection.hits` is annotated `list[RuleHit]`
+while `RuleHit` is defined below it, and `InputEvent.from_evdev` and
+`Device.from_udev` are annotated with the very classes whose bodies are still
+executing. On 3.13 and older these are evaluated eagerly and raise `NameError`
+at import time.
+
+Nothing else in the codebase needs 3.14 -- the rest runs on 3.11 -- so
+supporting older versions would mean reordering one class and adding
+`from __future__ import annotations` to two modules. That was a deliberate
+choice against: the project targets a current interpreter and says so here.
 
 ## Run
 
